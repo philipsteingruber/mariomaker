@@ -1,7 +1,8 @@
 import pygame
-from settings import *
 
 from editor import Editor
+from settings import WINDOW_HEIGHT, WINDOW_WIDTH
+
 
 class Main:
 	def __init__(self):
@@ -21,4 +22,4 @@ class Main:
 
 if __name__ == '__main__':
 	main = Main()
-	main.run() 
+	main.run()

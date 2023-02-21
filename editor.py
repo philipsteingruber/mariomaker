@@ -1,11 +1,11 @@
 import pygame
-import sys
 from pygame.math import Vector2
-from settings import WINDOW_WIDTH, WINDOW_HEIGHT, TILE_SIZE, LINE_COLOR
+from settings import WINDOW_WIDTH, WINDOW_HEIGHT, TILE_SIZE, LINE_COLOR, EDITOR_DATA
+from menu import Menu
 
 
 class Editor:
-	def __init__(self):
+	def __init__(self) -> None:
 		self.display_surface = pygame.display.get_surface()
 
 		self.origin = Vector2()
@@ -16,32 +16,29 @@ class Editor:
 		self.gridlines_surface.set_colorkey('green')
 		self.gridlines_surface.set_alpha(20)
 
-	def event_loop(self):
-		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
-				pygame.quit()
-				sys.exit()
-			self.pan_screen(event)
+		self.selected_index = 2
 
-	def pan_screen(self, event):
+		self.menu = Menu()
 
-		if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed()[1]:
-			self.pan_active = True
-			self.pan_offset = Vector2(pygame.mouse.get_pos()) - self.origin
+	def pan_screen(self, events: list[pygame.event.Event]) -> None:
+		for event in events:
+			if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed()[1]:
+				self.pan_active = True
+				self.pan_offset = Vector2(pygame.mouse.get_pos()) - self.origin
 
-		if not pygame.mouse.get_pressed()[1]:
-			self.pan_active = False
+			if not pygame.mouse.get_pressed()[1]:
+				self.pan_active = False
 
-		if event.type == pygame.MOUSEWHEEL:
-			if pygame.key.get_pressed()[pygame.K_LCTRL]:
-				self.origin.y -= event.y * 50
-			else:
-				self.origin.x -= event.y * 50
+			if event.type == pygame.MOUSEWHEEL:
+				if pygame.key.get_pressed()[pygame.K_LCTRL]:
+					self.origin.y += event.y * 50
+				else:
+					self.origin.x -= event.y * 50
 
-		if self.pan_active:
-			self.origin = Vector2(pygame.mouse.get_pos()) - self.pan_offset
+			if self.pan_active:
+				self.origin = Vector2(pygame.mouse.get_pos()) - self.pan_offset
 
-	def draw_gridlines(self):
+	def draw_gridlines(self) -> None:
 		cols = WINDOW_WIDTH // TILE_SIZE
 		rows = WINDOW_HEIGHT // TILE_SIZE
 
@@ -61,10 +58,29 @@ class Editor:
 
 		self.display_surface.blit(self.gridlines_surface, (0, 0))
 
-	def run(self, dt):
-		self.event_loop()
+	def change_selected_index(self, events: list[pygame.event.Event]) -> None:
+		for event in events:
+			if event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_RIGHT:
+					self.selected_index += 1
+				elif event.key == pygame.K_LEFT:
+					self.selected_index -= 1
+				if self.selected_index < 2:
+					self.selected_index = 18
+				elif self.selected_index > 18:
+					self.selected_index = 2
 
-		# drawing
+	def menu_click(self, events: list[pygame.event.Event]):
+		for event in events:
+			if event.type == pygame.MOUSEBUTTONDOWN and self.menu.rect.collidepoint(pygame.mouse.get_pos()):
+				self.selected_index = self.menu.click(mouse_pos=pygame.mouse.get_pos(), mouse_button=pygame.mouse.get_pressed())
+
+	def run(self, dt: float, events: list[pygame.event.Event]) -> None:
+		self.pan_screen(events)
+		self.change_selected_index(events)
+		self.menu_click(events)
+
 		self.display_surface.fill('white')
 		self.draw_gridlines()
 		pygame.draw.circle(self.display_surface, 'red', self.origin, 10)
+		self.menu.display(self.selected_index)

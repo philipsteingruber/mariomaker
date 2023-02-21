@@ -2,6 +2,7 @@ import pygame
 from pygame.math import Vector2
 from settings import WINDOW_WIDTH, WINDOW_HEIGHT, TILE_SIZE, LINE_COLOR, EDITOR_DATA
 from menu import Menu
+from timer import Timer
 
 
 class Editor:
@@ -17,8 +18,10 @@ class Editor:
 		self.gridlines_surface.set_alpha(20)
 
 		self.selected_index = 2
-
 		self.menu = Menu()
+
+		self.canvas_data = {}
+		self.changed_cell = Timer(200)
 
 	def pan_screen(self, events: list[pygame.event.Event]) -> None:
 		for event in events:
@@ -75,12 +78,74 @@ class Editor:
 			if event.type == pygame.MOUSEBUTTONDOWN and self.menu.rect.collidepoint(pygame.mouse.get_pos()):
 				self.selected_index = self.menu.click(mouse_pos=pygame.mouse.get_pos(), mouse_button=pygame.mouse.get_pressed())
 
-	def run(self, dt: float, events: list[pygame.event.Event]) -> None:
-		self.pan_screen(events)
-		self.change_selected_index(events)
-		self.menu_click(events)
+	def get_current_cell(self) -> tuple[int, int]:
+		vector_to_origin = Vector2(pygame.mouse.get_pos()) - self.origin
 
+		x = int(vector_to_origin.x / TILE_SIZE)
+		if vector_to_origin.x < 0:
+			x -= 1
+
+		y = int(vector_to_origin.y / TILE_SIZE)
+		if vector_to_origin.y < 0:
+			y -= 1
+
+		return x, y
+
+	def handle_canvas_click(self, events: list[pygame.event.Event]) -> None:
+		if pygame.MOUSEBUTTONDOWN in [event.type for event in events]:
+			if pygame.mouse.get_pressed()[0] and not self.menu.rect.collidepoint(pygame.mouse.get_pos()):  # and not self.changed_cell.active:
+				cell = self.get_current_cell()
+				if cell in self.canvas_data:
+					self.canvas_data[cell].add_tile_id(self.selected_index)
+				else:
+					self.canvas_data[cell] = CanvasTile(self.selected_index)
+				self.changed_cell.activate()
+				for key, value in self.canvas_data.items():
+					print(f'{key}: {value.has_terrain}, {value.has_water}')
+
+	def run(self, dt: float, events: list[pygame.event.Event]) -> None:
 		self.display_surface.fill('white')
 		self.draw_gridlines()
-		pygame.draw.circle(self.display_surface, 'red', self.origin, 10)
+
+		self.pan_screen(events)
+
+		self.change_selected_index(events)
+		self.menu_click(events)
 		self.menu.display(self.selected_index)
+
+		pygame.draw.circle(self.display_surface, 'red', self.origin, 10)
+
+		self.handle_canvas_click(events)
+
+		self.changed_cell.update()
+
+
+class CanvasTile:
+	def __init__(self, tile_id: int) -> None:
+		self.has_terrain = False
+		self.terrain_neighbours = []
+
+		self.has_water = False
+		self.water_on_top = False
+
+		self.coin = None
+
+		self.enemy = None
+
+		self.objects = []
+
+		self.add_tile_id(tile_id)
+
+	def add_tile_id(self, tile_id: int) -> None:
+		options = {key: value['style'] for key, value in EDITOR_DATA.items()}
+		style = options[tile_id]
+		match style:
+			case 'terrain':
+				self.has_terrain = True
+			case 'water':
+				self.has_water = True
+			case 'coin':
+				self.coin = tile_id
+			case 'enemy':
+				self.enemy = tile_id
+
